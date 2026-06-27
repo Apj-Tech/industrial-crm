@@ -2,13 +2,14 @@
   "name": "industrial-crm-backend",
   "version": "1.0.0",
   "private": true,
-  "main": "src/index.js",
+  "main": "dist/index.js",
 "prisma": {
   "schema": "prisma/schema.prisma"
 },
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
+"build": "tsc",
+    "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
