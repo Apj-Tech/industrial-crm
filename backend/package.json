@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "main": "src/index.js",
+"prisma": {
+  "schema": "prisma/schema.prisma"
+},
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
