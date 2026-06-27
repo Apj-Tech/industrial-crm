@@ -1,0 +1,11 @@
+const express = require('express');
+const router = express.Router();
+const { getOverview, getMonthly, getEmployeeAnalytics, getCustomerSegmentation, getWinLoss } = require('../controllers/analytics.controller');
+const { authenticate, requireAdmin, requireManager } = require('../middleware/auth');
+router.use(authenticate);
+router.get('/overview', getOverview);
+router.get('/monthly', getMonthly);
+router.get('/employee', requireManager, getEmployeeAnalytics);
+router.get('/segmentation', requireAdmin, getCustomerSegmentation);
+router.get('/win-loss', getWinLoss);
+module.exports = router;

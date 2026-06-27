@@ -1,0 +1,34 @@
+{
+  "name": "industrial-crm-desktop",
+  "version": "1.0.0",
+  "description": "Industrial CRM — Windows Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:win-portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.industrialcrm.app",
+    "productName": "Industrial CRM",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "icon.ico", "package.json"],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

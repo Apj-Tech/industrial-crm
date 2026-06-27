@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROLES: SUPER_ADMIN | ADMIN | MANAGER | SALES_ENGINEER | SALES
+// ─────────────────────────────────────────────────────────────────────────────
+model User {
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  password          String
+  role              String   @default("SALES")
+  isActive          Boolean  @default(true)
+  isLocked          Boolean  @default(false)
+  phone             String?
+  avatar            String?
+  department        String?
+  lastLoginAt       DateTime?
+  failedLoginCount  Int      @default(0)
+  twoFactorEnabled  Boolean  @default(false)
+  sessionTimeout    Int      @default(480)  // minutes, default 8h
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customers        Customer[]
+  meetings         Meeting[]
+  assignedMeetings Meeting[]    @relation("MeetingAssignedTo")
+  quotations       Quotation[]
+  attendance       Attendance[]
+  leaves           Leave[]
+  activityLogs     ActivityLog[]
+  approvals        Approval[]
+  followUpAlerts   FollowUpAlert[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOMER — with GPS location for geo-fence check-in
+// ─────────────────────────────────────────────────────────────────────────────
+model Customer {
+  id              String   @id @default(cuid())
+  companyName     String
+  contactPerson   String
+  contactNumber   String
+  designation     String?
+  email           String?
+  location        String?
+  address         String?
+  lat             Float?
+  lng             Float?
+  geoFenceRadius  Int      @default(200)  // metres — check-in allowed within this radius
+  mapsLink        String?
+  category        String?
+  industryType    String?
+  machineDetails  String?  // JSON string: [{model, make, year, specs}]
+  status          String   @default("ACTIVE")  // ACTIVE | PROSPECT | INACTIVE | LOST
+  remarks         String?
+  isActive        Boolean  @default(true)
+  createdById     String
+  createdBy       User     @relation(fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  meetings   Meeting[]
+  quotations Quotation[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEETING — enhanced with geo-fence check-in, timer, rich notes, attachments
+// ─────────────────────────────────────────────────────────────────────────────
+model Meeting {
+  id              String    @id @default(cuid())
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  assignedToId    String?
+  assignedTo      User?     @relation("MeetingAssignedTo", fields: [assignedToId], references: [id])
+
+  meetingDate     DateTime
+  meetingType     String
+
+  // Status pipeline
+  status          String    @default("NEW_LEAD")
+
+  // ── Geo-fence check-in ──────────────────────────────────────────
+  checkInLat      Float?    // employee GPS at time of check-in
+  checkInLng      Float?
+  checkInDistance Float?    // distance (metres) from customer GPS when checked in
+  checkedInAt     DateTime?
+  isGeoVerified   Boolean   @default(false)
+
+  // ── Meeting timer ────────────────────────────────────────────────
+  timerStartedAt     DateTime?
+  timerEndedAt       DateTime?
+  timerPausedSeconds Int       @default(0)  // total seconds timer was paused
+  visitDurationMinutes Int?
+
+  // ── Rich notes ──────────────────────────────────────────────────
+  notes                String?
+  summary              String?
+  actionItems          String?
+  customerRequirements String?
+  competitorInfo       String?
+  opportunities        String?
+  attachments          String?  // JSON array of file paths
+
+  // ── Follow-up ───────────────────────────────────────────────────
+  nextFollowUp        DateTime?
+  followUpTime        String?   // "10:30" — time on nextFollowUp date
+  followUpPriority    String    @default("MEDIUM")  // LOW | MEDIUM | HIGH | URGENT
+
+  // ── Trial ───────────────────────────────────────────────────────
+  trialDate       DateTime?
+  trialStatus     String?
+  trialFeedback   String?
+
+  // ── Quotation ───────────────────────────────────────────────────
+  quotationDate   DateTime?
+  quotationStatus String?
+  reminderSent    Boolean   @default(false)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  followUpAlerts FollowUpAlert[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOLLOW-UP ALERT — scheduled reminders for overdue/upcoming follow-ups
+// ─────────────────────────────────────────────────────────────────────────────
+model FollowUpAlert {
+  id        String    @id @default(cuid())
+  meetingId String
+  meeting   Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  alertType String    // UPCOMING_24H | UPCOMING_SAME_DAY | OVERDUE | ESCALATION | WEEKLY
+  isRead    Boolean   @default(false)
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, isRead])
+  @@index([meetingId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CATEGORY / PRODUCT / STOCK / QUOTATION — unchanged
+// ─────────────────────────────────────────────────────────────────────────────
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String   @default("#64748b")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products          Product[]
+  stock             Stock[]
+  itemGroupMappings ItemGroupMapping[]
+}
+
+model ItemGroupMapping {
+  id         String    @id @default(cuid())
+  itemGroup  String    @unique
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+}
+
+model Product {
+  id             String    @id @default(cuid())
+  itemCode       String    @unique
+  productName    String
+  description    String?
+  unit           String?
+  standardPrice  Float     @default(0)
+  category       String?
+  categoryId     String?
+  categoryRef    Category? @relation(fields: [categoryId], references: [id])
+  productRef     String?
+  isCustom       Boolean   @default(false)
+  drawingNumber  String?
+  revisionNumber String?
+  hsnCode        String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  quotationItems QuotationItem[]
+  stock          Stock?
+}
+
+model Stock {
+  id               String    @id @default(cuid())
+  itemCode         String    @unique
+  itemName         String
+  itemType         String    @default("Regular")
+  productMaster    String?
+  productFamily    String?
+  productSubfamily String?
+  itemGroup        String?
+  categoryCode     String?
+  categoryId       String?
+  categoryRef      Category? @relation(fields: [categoryId], references: [id])
+  productId        String?   @unique
+  product          Product?  @relation(fields: [productId], references: [id])
+  availableStock   Float     @default(0)
+  reservedStock    Float     @default(0)
+  minimumStock     Float     @default(0)
+  netPrice         Float     @default(0)
+  xceedLp          Float     @default(0)
+  edd              String?
+  rad              String?
+  location         String?
+  isActive         Boolean   @default(true)
+  lastUpdated      DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Quotation {
+  id              String    @id @default(cuid())
+  quotationNumber String    @unique
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  status          String    @default("DRAFT")
+  version         Int       @default(1)
+  totalAmount     Float     @default(0)
+  notes           String?
+  validUntil      DateTime?
+  approvalStatus  String    @default("PENDING")
+  approvedById    String?
+  approvedAt      DateTime?
+  quotationDate   DateTime?
+  enquiryDate     DateTime?
+  toName          String?
+  toAddr1         String?
+  toAddr2         String?
+  toState         String?
+  kindAttn        String?
+  toDesignation   String?
+  enquiryRef      String?
+  subject         String?
+  salesTax        String?   @default("18% GST Extra")
+  paymentTerms    String?
+  validity        String?   @default("15 Days")
+  deliveryCharges String?
+  signCompany     String?
+  signName        String?
+  signDesignation String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items     QuotationItem[]
+  approvals Approval[]
+}
+
+model QuotationItem {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id])
+  itemCode    String
+  productName String
+  description String?
+  category    String?
+  unit        String?
+  quantity    Float
+  unitPrice   Float
+  discount    Float     @default(0)
+  netPrice    Float     @default(0)
+  totalPrice  Float
+  delivery    String?
+  hsnCode     String?
+  createdAt   DateTime  @default(now())
+}
+
+model Attendance {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  date         DateTime
+  checkIn      DateTime?
+  checkOut     DateTime?
+  checkInLat   Float?
+  checkInLng   Float?
+  checkOutLat  Float?
+  checkOutLng  Float?
+  workingHours Float?
+  status       String    @default("PENDING")
+  adminNote    String?
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  locationPings LocationPing[]
+}
+
+model LocationPing {
+  id           String     @id @default(cuid())
+  attendanceId String
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  lat          Float
+  lng          Float
+  accuracy     Float?
+  capturedAt   DateTime   @default(now())
+
+  @@index([attendanceId, capturedAt])
+}
+
+model Leave {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  leaveType    String
+  fromDate     DateTime
+  toDate       DateTime
+  totalDays    Float
+  reason       String?
+  status       String    @default("PENDING")
+  adminNote    String?
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Approval {
+  id          String     @id @default(cuid())
+  type        String
+  entityId    String
+  requestById String
+  requestBy   User       @relation(fields: [requestById], references: [id])
+  status      String     @default("PENDING")
+  note        String?
+  quotationId String?
+  quotation   Quotation? @relation(fields: [quotationId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entityType String?
+  entityId   String?
+  details    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}

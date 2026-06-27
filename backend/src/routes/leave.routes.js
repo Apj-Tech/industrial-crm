@@ -1,0 +1,11 @@
+const express = require('express');
+const router = express.Router();
+const { getLeaves, createLeave, approveLeave } = require('../controllers/leave.controller');
+const { exportLeaves } = require('../controllers/export.controller');
+const { authenticate, requireAdmin } = require('../middleware/auth');
+router.use(authenticate);
+router.get('/export', requireAdmin, exportLeaves);
+router.get('/', getLeaves);
+router.post('/', createLeave);
+router.patch('/:id/approve', requireAdmin, approveLeave);
+module.exports = router;

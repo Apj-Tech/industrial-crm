@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+dev.db
+dev.db-journal
+.env.local
+.git
+*.log
+.DS_Store
+android/app/build
+android/.gradle
+ios/App/Pods
+ios/App/build
+nginx/certbot-www
+nginx/certbot-certs
