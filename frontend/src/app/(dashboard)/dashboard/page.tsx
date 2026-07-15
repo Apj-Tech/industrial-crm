@@ -161,7 +161,7 @@ export default function DashboardPage() {
                 <tr><td colSpan={6} className="py-8 text-center text-muted">No overdue follow-ups 🎉</td></tr>
               ) : stats.overdueList.map((f: { id: string; customerId: string; customer: { companyName: string; contactPerson: string }; nextFollowUp: string; status: string }) => (
                 <tr key={f.id} className="table-row">
-                  <td className="py-2.5 pr-4 font-medium text-slate-900 dark:text-slate-100">{f.customer.companyName}</td>
+                  <td className="py-2.5 pr-4 font-medium text-slate-900 dark:text-slate-100">{f.customer.companyName ?? "Unknown Customer"}</td>
                   <td className="py-2.5 pr-4 text-muted">{f.customer.contactPerson}</td>
                   <td className="py-2.5 pr-4 text-muted">-</td>
                   <td className="py-2.5 pr-4 text-red-500">{new Date(f.nextFollowUp).toLocaleDateString('en-IN')}</td>
